@@ -132,10 +132,6 @@ return {
     [723776431]                      = { stool = { offset = vector3(0.0, 0.1, 0.45), rotation = vector3(0.0, 0.0, 225.0) } },
     [1764072205]                     = { chair = { offset = vector3(0.0, 0.0, 0.0), rotation = vector3(0.0, 0.0, 0.0) } },
 
-    -- Apply this to your sp_chairs/shared/models.lua (chairs untouched).
-    -- You already set v_med_bed2; the rest now match that framing:
-    -- camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) }
-
     [-1182962909]                    = {
         medical = {
             offset = vector3(0.0, 0.0, 2.0),
@@ -145,7 +141,12 @@ return {
     },
 
     [`v_med_bed1`]                   = {
-        -- chair unchanged
+        chair = {
+            offset = vector3(-0.15, 0.0, 1.35),
+            rotation = vector3(0.0, 0.0, 180.0),
+            anim = { dict = 'rcm_barry3', name = 'barry_3_sit_loop', flag = 1 },
+            camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) },
+        },
         medical = {
             offset = vector3(-0.1, 0.0, 1.35),
             rotation = vector3(0.0, 0.0, 180.0),
@@ -154,8 +155,12 @@ return {
     },
 
     [`v_med_bed2`]                   = {
-        -- chair unchanged
-        -- (keep your manual edit)
+        chair = {
+            offset = vector3(-0.15, 0.0, 1.35),
+            rotation = vector3(0.0, 0.0, 180.0),
+            anim = { dict = 'rcm_barry3', name = 'barry_3_sit_loop', flag = 1 },
+            camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) },
+        },
         medical = {
             offset = vector3(-0.1, 0.0, 1.35),
             rotation = vector3(0.0, 0.0, 180.0),
@@ -163,7 +168,7 @@ return {
         },
     },
 
-    [1573503690]                     = { -- G&N Surgery
+    [1573503690]                     = {
         medical = {
             offset = vector3(0.0, 0.0, 1.15),
             rotation = vector3(0.0, 0.0, 180.0),
@@ -171,8 +176,13 @@ return {
         },
     },
 
-    [1004440924]                     = { -- G&N beds
-        -- chair unchanged
+    [1004440924]                     = {
+        chair = {
+            offset = vector3(-0.15, -0.15, 1.4),
+            rotation = vector3(0.0, 0.0, 180.0),
+            anim = { dict = 'rcm_barry3', name = 'barry_3_sit_loop', flag = 1 },
+            camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) },
+        },
         medical = {
             offset = vector3(0.1, -0.15, 1.4),
             rotation = vector3(0.0, 0.0, 180.0),
@@ -180,8 +190,13 @@ return {
         },
     },
 
-    [1219739426]                     = { -- Eclipse beds
-        -- chair unchanged
+    [1219739426]                     = {
+        chair = {
+            offset = vector3(0.0, 0.0, 1.7),
+            rotation = vector3(0.0, 0.0, 90.0),
+            anim = { dict = 'rcm_barry3', name = 'barry_3_sit_loop', flag = 1 },
+            camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) },
+        },
         medical = {
             offset = vector3(0.0, 0.0, 1.7),
             rotation = vector3(0.0, 0.0, 90.0),
@@ -189,7 +204,7 @@ return {
         },
     },
 
-    [-1519439119]                    = { -- Surgery bed
+    [-1519439119]                    = {
         medical = {
             offset = vector3(0.0, 0.1, 2.0),
             rotation = vector3(0.0, 0.0, 180.0),
@@ -197,19 +212,18 @@ return {
         },
     },
 
-    [-289946279]                     = { -- MRI/X-ray beds
+    [-289946279]                     = {
         medical = {
             offset = vector3(0.0, 0.1, 2.0),
             rotation = vector3(0.0, 0.0, 180.0),
             camera = { offset = vector3(0.0, -3.0, 1.25), target = vector3(0.0, 0.0, 0.0) },
         },
     },
-
 
     -- Misc
-    [-1829764702] = { stool = { offset = vector3(0.0, 0.05, 1.15), rotation = vector3(0.0, 0.0, -155.0) } },
-    [1378851084]  = { stool = { offset = vector3(0.0, 0.05, 1.15), rotation = vector3(0.0, 0.0, -180.0) } },
-    [448106647]   = { chair = { offset = vector3(0.0, -0.05, 0.45), rotation = vector3(0.0, 0.0, -180.0) } },
-    [-1761659350] = { chair = { offset = vector3(0.0, -0.05, 0.45), rotation = vector3(0.0, 0.0, -180.0) } },
-    [-1498352975] = { sunbed = { offset = vector3(0.0, -0.27, 1.35), rotation = vector3(0.0, 0.0, 185.0) } },
+    [-1829764702]                    = { stool = { offset = vector3(0.0, 0.05, 1.15), rotation = vector3(0.0, 0.0, -155.0) } },
+    [1378851084]                     = { stool = { offset = vector3(0.0, 0.05, 1.15), rotation = vector3(0.0, 0.0, -180.0) } },
+    [448106647]                      = { chair = { offset = vector3(0.0, -0.05, 0.45), rotation = vector3(0.0, 0.0, -180.0) } },
+    [-1761659350]                    = { chair = { offset = vector3(0.0, -0.05, 0.45), rotation = vector3(0.0, 0.0, -180.0) } },
+    [-1498352975]                    = { sunbed = { offset = vector3(0.0, -0.27, 1.35), rotation = vector3(0.0, 0.0, 185.0) } },
 }
