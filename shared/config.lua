@@ -4,25 +4,26 @@
 ---@field flag? number
 
 ---@class ChairsConfig
----@field Target { distance: number }
----@field AllowPutOnMedicalBeds boolean
----@field Default ChairsAnim
+---@field target { distance: number }
+---@field allowPutOnMedicalBeds boolean
+---@field default ChairsAnim
 
 local Config ---@type ChairsConfig
 Config = {
-    Target = {
+    target = {
         distance = 2.0
     },
 
     -- Toggle whether players can place others onto medical beds
-    AllowPutOnMedicalBeds = true,
+    allowPutOnMedicalBeds = true,
 
     -- Fallback anim if a base/model doesn't specify one
-    Default = {
+    default = {
         dict = 'missfbi1',
         name = 'cpr_pumpchest_idle',
         flag = 1
     },
+    wasabiPoliceCompat = true
 }
 
 return Config
