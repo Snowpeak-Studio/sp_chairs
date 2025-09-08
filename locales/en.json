@@ -1,5 +1,6 @@
 {
     "sit": "Sit",
+    "occupied": "This is occupied",
     "laydown": "Lay Down",
     "laydown_medical": "Lay Down (Medical)",
     "sit_chair": "Sit on Chair",

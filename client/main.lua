@@ -21,12 +21,45 @@
 ---@field [string]: { anim?: ChairsAnim, text?: string }
 
 ---@type table
-local Config = require 'shared.config'
+local Config = require('shared.config')
 ---@type BasesMap
-local Bases  = require 'shared.bases'
+local Bases  = require('shared.bases')
 ---@type ModelsMap
-local Models = require 'shared.models'
-local Keys   = require '@sp_core.data.keys'
+local Models = require('shared.models')
+local Keys   = require('@sp_core.data.keys')
+
+-- ========= occupancy guard (cached, uses enumerators) =========
+local chairCache = { }
+local cacheTime = 0
+
+---@param entity number
+---@param ped number|nil
+---@return boolean
+local function isOccupied(entity, ped)
+    -- refresh cache every 2s
+    if not cacheTime or (GetGameTimer() - cacheTime) > 2000 then
+        chairCache = {}
+        cacheTime = GetGameTimer()
+
+        for p in sp.enumerateEntities.peds() do
+            local attached = IsEntityAttached(p) and GetEntityAttachedTo(p)
+            if attached and DoesEntityExist(attached) then
+                chairCache[attached] = p
+            end
+        end
+    end
+
+    local attachedPed = chairCache[entity or false]
+    return attachedPed ~= nil and (not ped or attachedPed ~= ped)
+end
+
+---@param entity number
+---@param currentPed number
+---@return boolean
+local function canUseEntity(entity, currentPed)
+    if Config.allowSameEntitySit then return true end
+    return not isOccupied(entity, currentPed)
+end
 
 -- ========= helpers =========
 
@@ -77,11 +110,30 @@ local function createPoseCamera(entity, camera)
     return cam
 end
 
----Execute a pose on an entity (attach, anim, optional camera).
+---Check if an entity has a pose key.
+---@param entity number
+---@param pose string
+---@return boolean
+local function hasPose(entity, pose)
+    ---@type table<string, PoseEntry>|nil
+    local t = Models[GetEntityModel(entity)]
+    return t ~= nil and t[pose] ~= nil
+end
+
+---Execute a pose on an entity (occupancy check, attach, anim, optional camera).
 ---@param entity number
 ---@param baseName string
 local function doPose(entity, baseName)
-    local ped      = cache.ped
+    local ped = cache.ped
+    if not canUseEntity(entity, ped) then
+        Bridge.ui.notify({
+            color = 'negative',
+            icon = 'fa-solid fa-circle-xmark',
+            message = locale('occupied')
+        })
+        return
+    end
+
     local model    = GetEntityModel(entity)
     ---@type table<string, PoseEntry>
     local perModel = Models[model] or {}
@@ -107,7 +159,8 @@ local function doPose(entity, baseName)
         icon = 'fa-solid fa-chair',
         position = 'right-center'
     })
-    -- basic stand-up on E
+    
+    -- basic stand-up on key
     CreateThread(function()
         while DoesEntityExist(entity) and IsEntityAttachedToEntity(ped, entity) do
             if IsControlJustReleased(0, Keys[Config.standUpKey]) or IsDisabledControlJustPressed(0, Keys[Config.standUpKey]) then
@@ -130,38 +183,34 @@ local function doPose(entity, baseName)
     end)
 end
 
----Check if an entity has a pose key.
+---Client-side trigger to perform a pose (respects occupancy).
 ---@param entity number
 ---@param pose string
----@return boolean
-local function hasPose(entity, pose)
-    ---@type table<string, PoseEntry>|nil
-    local t = Models[GetEntityModel(entity)]
-    return t ~= nil and t[pose] ~= nil
+local function checkAndDo(entity, pose)
+    if not DoesEntityExist(entity) then return end
+    if not canUseEntity(entity, cache.ped) then
+        Bridge.ui.notify({ type = 'error', description = locale('occupied') })
+        return
+    end
+    doPose(entity, pose)
 end
+
 
 -- ========= events =========
 
----Client-side trigger to perform a pose.
----@param entity number
----@param pose string
-AddEventHandler(Shared.event .. 'doPose', function(entity, pose)
-    if not DoesEntityExist(entity) then return end
-    doPose(entity, pose)
-end)
 
----Force “medical” on the nearest supported model within 2.0m.
+---Force “medical” on the nearest supported model within 2.0m (respects occupancy).
 RegisterNetEvent(Shared.event .. 'forceMedical', function()
     local ped = cache.ped
     local pos = GetEntityCoords(ped)
-    local closestEnt, closestModel, bestDist = 0, 0, 2.0
+    local closestEnt, bestDist = 0, 2.0
     for model, poses in pairs(Models) do
         if poses.medical then
             local ent = GetClosestObjectOfType(pos.x, pos.y, pos.z, 10.0, model, false, false, false)
             if ent ~= 0 then
                 local dist = #(GetEntityCoords(ent) - pos)
-                if dist <= bestDist and HasEntityClearLosToEntity(ped, ent, 17) then
-                    closestEnt, closestModel, bestDist = ent, model, dist
+                if dist <= bestDist and HasEntityClearLosToEntity(ped, ent, 17) and canUseEntity(ent, ped) then
+                    closestEnt, bestDist = ent, dist
                 end
             end
         end
@@ -185,79 +234,81 @@ local function registerTargets()
             label = locale('laydown_medical'),
             distance = Config.target.distance,
             ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'medical') or false end,
+            canInteract = function(entity)
+                return hasPose(entity, 'medical') and canUseEntity(entity, cache.ped)
+            end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'medical') end
+            onSelect = function(data) checkAndDo(data.entity, 'medical') end
         },
         {
             name = 'sp_chairs:chair',
             icon = 'fa-solid fa-chair',
             label = locale('sit_chair'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'chair') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair') end
+            canInteract = function(entity)
+                return hasPose(entity, 'chair') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'chair') end
         },
         {
             name = 'sp_chairs:chair2',
             icon = 'fa-solid fa-chair',
             label = locale('sit_chair2'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'chair2') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair2') end
+            canInteract = function(entity)
+                return hasPose(entity, 'chair2') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'chair2') end
         },
         {
             name = 'sp_chairs:chair3',
             icon = 'fa-solid fa-chair',
             label = locale('sit_chair3'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'chair3') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair3') end
+            canInteract = function(entity)
+                return hasPose(entity, 'chair3') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'chair3') end
         },
         {
             name = 'sp_chairs:chair4',
             icon = 'fa-solid fa-chair',
             label = locale('sit_chair4'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'chair4') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair4') end
+            canInteract = function(entity)
+                return hasPose(entity, 'chair4') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'chair4') end
         },
         {
             name = 'sp_chairs:stool',
             icon = 'fa-solid fa-circle-dot',
             label = locale('sit_stool'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'stool') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'stool') end
+            canInteract = function(entity)
+                return hasPose(entity, 'stool') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'stool') end
         },
         {
             name = 'sp_chairs:slots',
             icon = 'fa-solid fa-slot-machine',
             label = locale('use_slots'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'slots') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'slots') end
+            canInteract = function(entity)
+                return hasPose(entity, 'slots') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'slots') end
         },
         {
             name = 'sp_chairs:sunbed',
             icon = 'fa-solid fa-bed',
             label = locale('laydown_sunbed'),
             distance = Config.target.distance,
-            ---@param entity number
-            canInteract = function(entity) return hasPose(entity, 'sunbed') end,
-            ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'sunbed') end
+            canInteract = function(entity)
+                return hasPose(entity, 'sunbed') and canUseEntity(entity, cache.ped)
+            end,
+            onSelect = function(data) checkAndDo(data.entity, 'sunbed') end
         },
         -- Put person on medical (config-gated)
         {
@@ -265,19 +316,17 @@ local function registerTargets()
             icon = 'fa-solid fa-user-plus',
             label = locale('put_on_bed'),
             distance = Config.target.distance,
-            ---@param entity number
             canInteract = function(entity)
                 if not Config.allowPutOnMedicalBeds then return false end
                 if not hasPose(entity, 'medical') then return false end
+                if not canUseEntity(entity, cache.ped) then return false end
                 local myPos = GetEntityCoords(cache.ped)
-                ---@type number|nil, number|nil
                 local pid, ped = lib.getClosestPlayer(myPos, 2.0, false)
                 return pid and DoesEntityExist(ped)
             end,
             onSelect = function()
                 if not Config.allowPutOnMedicalBeds then return end
                 local myPos = GetEntityCoords(cache.ped)
-                ---@type number|nil
                 local pid = lib.getClosestPlayer(myPos, 2.0, false)
                 if pid then
                     TriggerServerEvent(Shared.serverEvent .. 'putOnMedical', GetPlayerServerId(pid))
@@ -294,13 +343,11 @@ AddEventHandler('onClientResourceStart', function(res)
     registerTargets()
 end)
 
-
+-- ========= utility command (unchanged) =========
 RegisterCommand('spawnbed', function(source, args, rawCommand)
     local ped = PlayerPedId()
     local coords = GetEntityCoords(ped)
     local heading = GetEntityHeading(ped)
-
-    -- Prop model (hospital bed)
     local model = `v_med_bed1`
 
     RequestModel(model)
@@ -309,12 +356,12 @@ RegisterCommand('spawnbed', function(source, args, rawCommand)
     end
 
     local forward = GetEntityForwardVector(ped)
-    local spawnCoords = coords + forward * 2.0 -- 2m in front of player
+    local spawnCoords = coords + forward * 2.0
 
     local bed = CreateObject(model, spawnCoords.x, spawnCoords.y, spawnCoords.z, true, true, false)
     SetEntityHeading(bed, heading)
     PlaceObjectOnGroundProperly(bed)
     SetModelAsNoLongerNeeded(model)
 
-    print("Spawned medical bed.")
+    print('Spawned medical bed.')
 end, false)

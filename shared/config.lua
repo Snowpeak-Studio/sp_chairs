@@ -16,7 +16,8 @@ Config = {
         distance = 2.0
     },
     standUpKey = 'E',
-
+    -- check data/keys.lua in sp_core for list of available keybinds.
+    allowSameEntitySit = true,
     -- Toggle whether players can place others onto medical beds
     allowPutOnMedicalBeds = true,
 
