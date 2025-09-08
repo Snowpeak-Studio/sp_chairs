@@ -13,3 +13,7 @@ RegisterNetEvent('sp_chairs:putOnMedical', function(targetServerId)
     end
     TriggerClientEvent('sp_chairs:forceMedical', targetServerId)
 end)
+
+if Config.versionCheck then
+    sp.version('sp_chairs', GetResourceMetadata(GetCurrentResourceName(), 'version'))
+end

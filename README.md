@@ -1,14 +1,15 @@
 # sp_chairs
 
-Standalone sit/lie interactions for chairs, stools, and medical beds using **ox_target** + **ox_lib**.  
+Standalone sit/lie interactions for chairs, stools, and medical beds using  **ox_lib**, **sp_core**
 No framework required.
+Utilizes sp_core bridge, target must be configured.
 
 ---
 
 ## Requirements
 - `ox_lib` (uses `lib.requestAnimDict`, `lib.playAnim`, `lib.getClosestPlayer`)
-- `ox_target`
-
+- `sp_core` [Free to download from our tebex ] (https://shop.snowpeakstudio.com/package/7015578
+)
 ---
 
 ## Features

@@ -21,21 +21,20 @@
 ---@field [string]: { anim?: ChairsAnim, text?: string }
 
 ---@type table
-local Config    = require 'shared.config'
+local Config = require 'shared.config'
 ---@type BasesMap
-local Bases     = require 'shared.bases'
+local Bases  = require 'shared.bases'
 ---@type ModelsMap
-local Models    = require 'shared.models'
-local Utils     = require 'shared.utils'
-local ox_target = exports.ox_target
-require 'client.camera'
+local Models = require 'shared.models'
+local Keys   = require '@sp_core.data.keys'
+
 -- ========= helpers =========
 
 ---Play an animation, auto-request/unload dict.
 ---@param ped number
 ---@param anim ChairsAnim|nil
 local function playAnim(ped, anim)
-    anim = anim or Config.Default
+    anim = anim or Config.default
     if not anim or not anim.dict or not anim.name then return end
     if lib.requestAnimDict(anim.dict, 10000) then
         lib.playAnim(ped, anim.dict, anim.name, 8.0, 8.0, -1, anim.flag or 0, 0.0, false, 0, false)
@@ -69,12 +68,12 @@ local function createPoseCamera(entity, camera)
     local target = GetOffsetFromEntityInWorldCoords(entity, camera.target.x, camera.target.y, camera.target.z)
 
     ---@type table
-    local cam = Camera:Create({
+    local cam = sp.camera.create({
         coords = origin,
-        rotation = Utils.toRotation(Utils.normalize(target - origin), 1),
+        rotation = sp.coords.toRotation(sp.coords.normalize(target - origin), 1),
         fov = camera.fov or 55.0
     })
-    cam:Activate()
+    cam:activate()
     return cam
 end
 
@@ -95,7 +94,7 @@ local function doPose(entity, baseName)
 
     local offset   = entry.offset or vector3(0.0, 0.0, 0.0)
     local rotation = entry.rotation or vector3(0.0, 0.0, 0.0)
-    local anim     = entry.anim or base.anim or Config.Default
+    local anim     = entry.anim or base.anim or Config.default
 
     -- attach + anim
     attachPedToEntity(ped, entity, offset, rotation)
@@ -103,7 +102,7 @@ local function doPose(entity, baseName)
 
     -- optional camera
     local cam = createPoseCamera(entity, entry.camera)
-    lib.showTextUI('[E] Stand up', {
+    Bridge.ui.textUI.show('[' .. Config.standUpKey .. '] ' .. locale('getup'), {
         type = 'inform',
         icon = 'fa-solid fa-chair',
         position = 'right-center'
@@ -111,17 +110,23 @@ local function doPose(entity, baseName)
     -- basic stand-up on E
     CreateThread(function()
         while DoesEntityExist(entity) and IsEntityAttachedToEntity(ped, entity) do
-            if IsControlJustReleased(0, 38) then -- E
+            if IsControlJustReleased(0, Keys[Config.standUpKey]) or IsDisabledControlJustPressed(0, Keys[Config.standUpKey]) then
                 DetachEntity(ped, true, true)
                 FreezeEntityPosition(ped, false)
                 ClearPedTasksImmediately(ped)
-                lib.hideTextUI()
-                if cam then cam:Destroy() end
+                Bridge.ui.textUI.hide()
+                if cam then
+                    cam:destroy()
+                    cam = nil
+                end
                 break
             end
             Wait(0)
         end
-        if cam then cam:Destroy() end
+        if cam then
+            cam:destroy()
+            cam = nil
+        end
     end)
 end
 
@@ -166,19 +171,19 @@ end)
 
 -- ========= targets =========
 
----Register ox_target model options for all supported models/poses.
+---Register target model options for all supported models/poses.
 local function registerTargets()
     -- gather all model ids
     ---@type integer[]
     local models = {}
     for model, _ in pairs(Models) do models[#models + 1] = model end
 
-    ox_target:addModel(models, {
+    Bridge.target.addModel(models, {
         {
             name = 'sp_chairs:medical',
             icon = 'fa-solid fa-bed',
-            label = 'Lay (Medical)',
-            distance = Config.Target.distance,
+            label = locale('laydown_medical'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'medical') or false end,
             ---@param data {entity:number}
@@ -187,8 +192,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:chair',
             icon = 'fa-solid fa-chair',
-            label = 'Sit (Chair)',
-            distance = Config.Target.distance,
+            label = locale('sit_chair'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair') end,
             ---@param data {entity:number}
@@ -197,8 +202,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:chair2',
             icon = 'fa-solid fa-chair',
-            label = 'Sit (Chair 2)',
-            distance = Config.Target.distance,
+            label = locale('sit_chair2'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair2') end,
             ---@param data {entity:number}
@@ -207,8 +212,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:chair3',
             icon = 'fa-solid fa-chair',
-            label = 'Sit (Chair 3)',
-            distance = Config.Target.distance,
+            label = locale('sit_chair3'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair3') end,
             ---@param data {entity:number}
@@ -217,8 +222,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:chair4',
             icon = 'fa-solid fa-chair',
-            label = 'Sit (Chair 4)',
-            distance = Config.Target.distance,
+            label = locale('sit_chair4'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair4') end,
             ---@param data {entity:number}
@@ -227,8 +232,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:stool',
             icon = 'fa-solid fa-circle-dot',
-            label = 'Sit (Stool)',
-            distance = Config.Target.distance,
+            label = locale('sit_stool'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'stool') end,
             ---@param data {entity:number}
@@ -237,8 +242,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:slots',
             icon = 'fa-solid fa-slot-machine',
-            label = 'Use Slots',
-            distance = Config.Target.distance,
+            label = locale('use_slots'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'slots') end,
             ---@param data {entity:number}
@@ -247,8 +252,8 @@ local function registerTargets()
         {
             name = 'sp_chairs:sunbed',
             icon = 'fa-solid fa-bed',
-            label = 'Lay (Sunbed)',
-            distance = Config.Target.distance,
+            label = locale('laydown_sunbed'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'sunbed') end,
             ---@param data {entity:number}
@@ -258,11 +263,11 @@ local function registerTargets()
         {
             name = 'sp_chairs:put_person_medical',
             icon = 'fa-solid fa-user-plus',
-            label = 'Put Person On Bed',
-            distance = Config.Target.distance,
+            label = locale('put_on_bed'),
+            distance = Config.target.distance,
             ---@param entity number
             canInteract = function(entity)
-                if not Config.AllowPutOnMedicalBeds then return false end
+                if not Config.allowPutOnMedicalBeds then return false end
                 if not hasPose(entity, 'medical') then return false end
                 local myPos = GetEntityCoords(cache.ped)
                 ---@type number|nil, number|nil
@@ -270,7 +275,7 @@ local function registerTargets()
                 return pid and DoesEntityExist(ped)
             end,
             onSelect = function()
-                if not Config.AllowPutOnMedicalBeds then return end
+                if not Config.allowPutOnMedicalBeds then return end
                 local myPos = GetEntityCoords(cache.ped)
                 ---@type number|nil
                 local pid = lib.getClosestPlayer(myPos, 2.0, false)
@@ -282,7 +287,7 @@ local function registerTargets()
     })
 end
 
----ox_target registration on resource start.
+---Target registration on resource start.
 ---@param res string
 AddEventHandler('onClientResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end

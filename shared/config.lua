@@ -10,9 +10,11 @@
 
 local Config ---@type ChairsConfig
 Config = {
+    versionCheck = true,
     target = {
         distance = 2.0
     },
+    standUpKey = 'E',
 
     -- Toggle whether players can place others onto medical beds
     allowPutOnMedicalBeds = true,

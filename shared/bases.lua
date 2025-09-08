@@ -19,15 +19,15 @@ return {
         anim = { dict = 'anim_casino_a@amb@casino@games@slots@male', name = 'base_idle_b', flag = 1 },
     },
     bed = {
-        text = 'Lie',
+        text = locale('laydown'),
         anim = { dict = 'savecountryside@', name = 't_sleep_loop_countryside', flag = 1 },
     },
     medical = {
-        text = 'Lie',
+        text = locale('laydown'),
         anim = { dict = 'missfbi1', name = 'cpr_pumpchest_idle', flag = 1 },
     },
     sunbed = {
-        text = 'Lie',
+        text = locale('laydown'),
         anim = { dict = 'timetable@jimmy@mics3_ig_15@', name = 'mics3_15_base_jimmy', flag = 1 },
     },
 }

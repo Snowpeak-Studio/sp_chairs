@@ -1,5 +1,4 @@
 -- sp_chairs/shared/models.lua
--- Your model map unchanged (trimmed casino slots you commented out)
 return {
     [1805980844]                     = {
         chair  = { offset = vector3(0.0, -0.02, 0.49), rotation = vector3(0.0, 0.0, 180.0), },

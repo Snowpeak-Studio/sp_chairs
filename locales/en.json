@@ -1,0 +1,14 @@
+{
+    "sit": "Sit",
+    "laydown": "Lay Down",
+    "laydown_medical": "Lay Down (Medical)",
+    "sit_chair": "Sit on Chair",
+    "sit_chair2": "Sit on Chair (2)",
+    "sit_chair3": "Sit on Chair (3)",
+    "sit_chair4": "Sit on Chair (4)",
+    "sit_stool": "Sit on Stool",
+    "use_slots": "Sit at Slot Machine",
+    "laydown_sunbed": "Lay on Sunbed",
+    "put_on_bed": "Put Person on Bed",
+    "getup": "Get Up"
+}
