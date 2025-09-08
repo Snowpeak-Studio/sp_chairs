@@ -23,7 +23,7 @@ Config = {
         name = 'cpr_pumpchest_idle',
         flag = 1
     },
-    wasabiPoliceCompat = true
+    wasabiPoliceCompat = false
 }
 
 return Config
