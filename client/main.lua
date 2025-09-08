@@ -342,26 +342,3 @@ AddEventHandler('onClientResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     registerTargets()
 end)
-
--- ========= utility command (unchanged) =========
-RegisterCommand('spawnbed', function(source, args, rawCommand)
-    local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped)
-    local heading = GetEntityHeading(ped)
-    local model = `v_med_bed1`
-
-    RequestModel(model)
-    while not HasModelLoaded(model) do
-        Wait(10)
-    end
-
-    local forward = GetEntityForwardVector(ped)
-    local spawnCoords = coords + forward * 2.0
-
-    local bed = CreateObject(model, spawnCoords.x, spawnCoords.y, spawnCoords.z, true, true, false)
-    SetEntityHeading(bed, heading)
-    PlaceObjectOnGroundProperly(bed)
-    SetModelAsNoLongerNeeded(model)
-
-    print('Spawned medical bed.')
-end, false)
