@@ -1,6 +1,6 @@
 local Config = require 'shared.config'
 
-RegisterNetEvent('sp_chairs:putOnMedical', function(targetServerId)
+RegisterNetEvent(Shared.serverEvent .. 'putOnMedical', function(targetServerId)
     if not Config.allowPutOnMedicalBeds then return end
     if type(targetServerId) ~= 'number' then return end
     if Config.wasabiPoliceCompat and GetResourceState('wasabi_police') == 'started' then
@@ -11,9 +11,9 @@ RegisterNetEvent('sp_chairs:putOnMedical', function(targetServerId)
             state:set('escorted', false, true)
         end
     end
-    TriggerClientEvent('sp_chairs:forceMedical', targetServerId)
+    TriggerClientEvent(Shared.event .. 'forceMedical', targetServerId)
 end)
 
 if Config.versionCheck then
-    sp.version('sp_chairs', GetResourceMetadata(GetCurrentResourceName(), 'version'))
+    sp.version(Shared.resource, Shared.version)
 end

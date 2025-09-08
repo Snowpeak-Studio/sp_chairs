@@ -10,6 +10,7 @@
 
 local Config ---@type ChairsConfig
 Config = {
+    debug = false,
     versionCheck = true,
     target = {
         distance = 2.0

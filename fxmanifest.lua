@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 name 'sp_chairs'
 author 'Snowpeak Studio / KodeRed'
-version '1.0.4'
+version '0.0.4'
 ox_lib 'locale'
 dependencies {
     'ox_lib',
@@ -14,6 +14,7 @@ shared_scripts {
     '@ox_lib/init.lua',
     '@sp_core/init.lua',
     '@sp_core/bridge/init.lua',
+    'shared/main.lua',
 
 }
 

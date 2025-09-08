@@ -116,7 +116,7 @@ local function doPose(entity, baseName)
                 ClearPedTasksImmediately(ped)
                 Bridge.ui.textUI.hide()
                 if cam then
-                    cam:destroy()
+                    cam:remove()
                     cam = nil
                 end
                 break
@@ -124,7 +124,7 @@ local function doPose(entity, baseName)
             Wait(0)
         end
         if cam then
-            cam:destroy()
+            cam:remove()
             cam = nil
         end
     end)
@@ -145,13 +145,13 @@ end
 ---Client-side trigger to perform a pose.
 ---@param entity number
 ---@param pose string
-RegisterNetEvent('sp_chairs:doPose', function(entity, pose)
+AddEventHandler(Shared.event .. 'doPose', function(entity, pose)
     if not DoesEntityExist(entity) then return end
     doPose(entity, pose)
 end)
 
 ---Force “medical” on the nearest supported model within 2.0m.
-RegisterNetEvent('sp_chairs:forceMedical', function()
+RegisterNetEvent(Shared.event .. 'forceMedical', function()
     local ped = cache.ped
     local pos = GetEntityCoords(ped)
     local closestEnt, closestModel, bestDist = 0, 0, 2.0
@@ -187,7 +187,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'medical') or false end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'medical') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'medical') end
         },
         {
             name = 'sp_chairs:chair',
@@ -197,7 +197,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'chair') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair') end
         },
         {
             name = 'sp_chairs:chair2',
@@ -207,7 +207,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair2') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'chair2') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair2') end
         },
         {
             name = 'sp_chairs:chair3',
@@ -217,7 +217,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair3') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'chair3') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair3') end
         },
         {
             name = 'sp_chairs:chair4',
@@ -227,7 +227,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'chair4') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'chair4') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'chair4') end
         },
         {
             name = 'sp_chairs:stool',
@@ -237,7 +237,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'stool') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'stool') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'stool') end
         },
         {
             name = 'sp_chairs:slots',
@@ -247,7 +247,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'slots') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'slots') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'slots') end
         },
         {
             name = 'sp_chairs:sunbed',
@@ -257,7 +257,7 @@ local function registerTargets()
             ---@param entity number
             canInteract = function(entity) return hasPose(entity, 'sunbed') end,
             ---@param data {entity:number}
-            onSelect = function(data) TriggerEvent('sp_chairs:doPose', data.entity, 'sunbed') end
+            onSelect = function(data) TriggerEvent(Shared.event .. 'doPose', data.entity, 'sunbed') end
         },
         -- Put person on medical (config-gated)
         {
@@ -280,7 +280,7 @@ local function registerTargets()
                 ---@type number|nil
                 local pid = lib.getClosestPlayer(myPos, 2.0, false)
                 if pid then
-                    TriggerServerEvent('sp_chairs:putOnMedical', GetPlayerServerId(pid))
+                    TriggerServerEvent(Shared.serverEvent .. 'putOnMedical', GetPlayerServerId(pid))
                 end
             end
         },
@@ -293,3 +293,28 @@ AddEventHandler('onClientResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     registerTargets()
 end)
+
+
+RegisterCommand('spawnbed', function(source, args, rawCommand)
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+
+    -- Prop model (hospital bed)
+    local model = `v_med_bed1`
+
+    RequestModel(model)
+    while not HasModelLoaded(model) do
+        Wait(10)
+    end
+
+    local forward = GetEntityForwardVector(ped)
+    local spawnCoords = coords + forward * 2.0 -- 2m in front of player
+
+    local bed = CreateObject(model, spawnCoords.x, spawnCoords.y, spawnCoords.z, true, true, false)
+    SetEntityHeading(bed, heading)
+    PlaceObjectOnGroundProperly(bed)
+    SetModelAsNoLongerNeeded(model)
+
+    print("Spawned medical bed.")
+end, false)
