@@ -88,8 +88,6 @@ end
 ---@param ped number
 ---@param anim ChairsAnim|nil
 function Helpers.playAnim(ped, anim)
-    print('Helpers.playAnim', ped)
-    print(sp.dump(anim))
     anim = anim or Config.default
     if not anim or not anim.dict or not anim.name then return end
     if lib.requestAnimDict(anim.dict, 10000) then
