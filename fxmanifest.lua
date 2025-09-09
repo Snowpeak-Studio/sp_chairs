@@ -13,7 +13,6 @@ dependencies {
 shared_scripts {
     '@ox_lib/init.lua',
     '@sp_core/init.lua',
-    '@sp_core/bridge/init.lua',
     'shared/main.lua',
 
 }

@@ -27,6 +27,11 @@ local Bases  = require('shared.bases')
 ---@type ModelsMap
 local Models = require('shared.models')
 local Keys   = require('@sp_core.data.keys')
+local Notify = require('@sp_core.bridge.shared').load('ui.notify')
+local TextUI = require('@sp_core.bridge.shared').load('ui.textUI')
+local Target = require('@sp_core.bridge.shared').load('target')
+
+
 
 -- ========= occupancy guard (cached, uses enumerators) =========
 local chairCache = { }
@@ -126,7 +131,7 @@ end
 local function doPose(entity, baseName)
     local ped = cache.ped
     if not canUseEntity(entity, ped) then
-        Bridge.ui.notify({
+        Notify({
             color = 'negative',
             icon = 'fa-solid fa-circle-xmark',
             message = locale('occupied')
@@ -154,7 +159,7 @@ local function doPose(entity, baseName)
 
     -- optional camera
     local cam = createPoseCamera(entity, entry.camera)
-    Bridge.ui.textUI.show('[' .. Config.standUpKey .. '] ' .. locale('getup'), {
+    TextUI.show('[' .. Config.standUpKey .. '] ' .. locale('getup'), {
         type = 'inform',
         icon = 'fa-solid fa-chair',
         position = 'right-center'
@@ -167,7 +172,7 @@ local function doPose(entity, baseName)
                 DetachEntity(ped, true, true)
                 FreezeEntityPosition(ped, false)
                 ClearPedTasksImmediately(ped)
-                Bridge.ui.textUI.hide()
+                TextUI.hide()
                 if cam then
                     cam:remove()
                     cam = nil
@@ -189,7 +194,7 @@ end
 local function checkAndDo(entity, pose)
     if not DoesEntityExist(entity) then return end
     if not canUseEntity(entity, cache.ped) then
-        Bridge.ui.notify({ type = 'error', description = locale('occupied') })
+        Notify({ type = 'error', description = locale('occupied') })
         return
     end
     doPose(entity, pose)
@@ -227,7 +232,7 @@ local function registerTargets()
     local models = {}
     for model, _ in pairs(Models) do models[#models + 1] = model end
 
-    Bridge.target.addModel(models, {
+    Target.addModel(models, {
         {
             name = 'sp_chairs:medical',
             icon = 'fa-solid fa-bed',
