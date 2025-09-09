@@ -17,10 +17,10 @@ Config = {
     },
     standUpKey = 'E',
     -- check data/keys.lua in sp_core for list of available keybinds.
-    allowSameEntitySit = true,
     -- Toggle whether players can place others onto medical beds
     allowPutOnMedicalBeds = true,
-
+    
+    medicalLocksEntity = true,
     -- Fallback anim if a base/model doesn't specify one
     default = {
         dict = 'missfbi1',

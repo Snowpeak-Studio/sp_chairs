@@ -1,121 +1,18 @@
----@class ChairsAnim
----@field dict string
----@field name string
----@field flag? number
-
----@class PoseCamera
----@field offset vector3
----@field target vector3
----@field fov? number
-
----@class PoseEntry
----@field offset vector3
----@field rotation vector3
----@field anim? ChairsAnim
----@field camera? PoseCamera
-
----@class ModelsMap
----@field [integer]: table<string, PoseEntry>
-
----@class BasesMap
----@field [string]: { anim?: ChairsAnim, text?: string }
-
 ---@type table
-local Config = require('shared.config')
+local Config  = require('shared.config')
 ---@type BasesMap
-local Bases  = require('shared.bases')
+local Bases   = require('shared.bases')
 ---@type ModelsMap
-local Models = require('shared.models')
-local Keys   = require('@sp_core.data.keys')
-local Notify = require('@sp_core.bridge.shared').load('ui.notify')
-local TextUI = require('@sp_core.bridge.shared').load('ui.textUI')
-local Target = require('@sp_core.bridge.shared').load('target')
+local Models  = require('shared.models')
+local Keys    = require('@sp_core.data.keys')
+local Notify  = require('@sp_core.bridge.shared').load('ui.notify')
+local TextUI  = require('@sp_core.bridge.shared').load('ui.textUI')
+local Target  = require('@sp_core.bridge.shared').load('target')
+local Helpers = require('client.helpers')
+local cachedCoords = nil
 
+-- ========= helpers (model/pose) =========
 
-
--- ========= occupancy guard (cached, uses enumerators) =========
-local chairCache = { }
-local cacheTime = 0
-
----@param entity number
----@param ped number|nil
----@return boolean
-local function isOccupied(entity, ped)
-    -- refresh cache every 2s
-    if not cacheTime or (GetGameTimer() - cacheTime) > 2000 then
-        chairCache = {}
-        cacheTime = GetGameTimer()
-
-        for p in sp.enumerateEntities.peds() do
-            local attached = IsEntityAttached(p) and GetEntityAttachedTo(p)
-            if attached and DoesEntityExist(attached) then
-                chairCache[attached] = p
-            end
-        end
-    end
-
-    local attachedPed = chairCache[entity or false]
-    return attachedPed ~= nil and (not ped or attachedPed ~= ped)
-end
-
----@param entity number
----@param currentPed number
----@return boolean
-local function canUseEntity(entity, currentPed)
-    if Config.allowSameEntitySit then return true end
-    return not isOccupied(entity, currentPed)
-end
-
--- ========= helpers =========
-
----Play an animation, auto-request/unload dict.
----@param ped number
----@param anim ChairsAnim|nil
-local function playAnim(ped, anim)
-    anim = anim or Config.default
-    if not anim or not anim.dict or not anim.name then return end
-    if lib.requestAnimDict(anim.dict, 10000) then
-        lib.playAnim(ped, anim.dict, anim.name, 8.0, 8.0, -1, anim.flag or 0, 0.0, false, 0, false)
-        RemoveAnimDict(anim.dict)
-    end
-end
-
----Attach a ped to an entity using pose offset/rotation.
----@param ped number
----@param entity number
----@param offset vector3
----@param rotation vector3
-local function attachPedToEntity(ped, entity, offset, rotation)
-    FreezeEntityPosition(ped, true)
-    SetEntityCoords(ped, GetEntityCoords(entity)) -- ensure same interior/room
-    AttachEntityToEntity(
-        ped, entity, 0,
-        offset.x, offset.y, offset.z,
-        rotation.x, rotation.y, rotation.z,
-        false, false, true, false, 2, true
-    )
-end
-
----Create and activate a simple “look-at” camera for a pose.
----@param entity number
----@param camera PoseCamera|nil
----@return table|nil cam
-local function createPoseCamera(entity, camera)
-    if not camera then return nil end
-    local origin = GetOffsetFromEntityInWorldCoords(entity, camera.offset.x, camera.offset.y, camera.offset.z)
-    local target = GetOffsetFromEntityInWorldCoords(entity, camera.target.x, camera.target.y, camera.target.z)
-
-    ---@type table
-    local cam = sp.camera.create({
-        coords = origin,
-        rotation = sp.coords.toRotation(sp.coords.normalize(target - origin), 1),
-        fov = camera.fov or 55.0
-    })
-    cam:activate()
-    return cam
-end
-
----Check if an entity has a pose key.
 ---@param entity number
 ---@param pose string
 ---@return boolean
@@ -125,86 +22,84 @@ local function hasPose(entity, pose)
     return t ~= nil and t[pose] ~= nil
 end
 
----Execute a pose on an entity (occupancy check, attach, anim, optional camera).
+---Execute a pose (per-entity statebag reserve -> attach -> anim -> camera -> release)
 ---@param entity number
 ---@param baseName string
 local function doPose(entity, baseName)
-    local ped = cache.ped
-    if not canUseEntity(entity, ped) then
-        Notify({
-            color = 'negative',
-            icon = 'fa-solid fa-circle-xmark',
-            message = locale('occupied')
-        })
+    if not DoesEntityExist(entity) then return end
+
+    -- fast local read
+    if not Helpers.isPoseFree(entity, baseName) then
+        Notify({ color = 'negative', icon = 'fa-solid fa-circle-xmark', message = locale('occupied') })
+        return
+    end
+    -- optimistic reserve on this entity's statebag
+    if not Helpers.reservePose(entity, baseName) then
+        Notify({ color = 'negative', icon = 'fa-solid fa-circle-xmark', message = locale('occupied') })
         return
     end
 
+    local ped      = cache.ped
     local model    = GetEntityModel(entity)
-    ---@type table<string, PoseEntry>
     local perModel = Models[model] or {}
-    ---@type PoseEntry|nil
     local entry    = perModel[baseName]
-    ---@type { anim?: ChairsAnim, text?: string }|nil
     local base     = Bases[baseName]
-
-    if not entry or not base then return end
+    if not entry or not base then
+        Helpers.releasePose(entity, baseName)
+        return
+    end
 
     local offset   = entry.offset or vector3(0.0, 0.0, 0.0)
     local rotation = entry.rotation or vector3(0.0, 0.0, 0.0)
     local anim     = entry.anim or base.anim or Config.default
+    cachedCoords = vec4(GetEntityCoords(cache.ped), GetEntityHeading(cache.ped))
+    Helpers.attachPedToEntity(ped, entity, offset, rotation)
+    Helpers.playAnim(ped, anim)
 
-    -- attach + anim
-    attachPedToEntity(ped, entity, offset, rotation)
-    playAnim(ped, anim)
-
-    -- optional camera
-    local cam = createPoseCamera(entity, entry.camera)
+    local cam = Helpers.createPoseCamera(entity, entry.camera)
     TextUI.show('[' .. Config.standUpKey .. '] ' .. locale('getup'), {
-        type = 'inform',
-        icon = 'fa-solid fa-chair',
-        position = 'right-center'
+        type = 'inform', icon = 'fa-solid fa-chair', position = 'right-center'
     })
-    
-    -- basic stand-up on key
+
     CreateThread(function()
         while DoesEntityExist(entity) and IsEntityAttachedToEntity(ped, entity) do
             if IsControlJustReleased(0, Keys[Config.standUpKey]) or IsDisabledControlJustPressed(0, Keys[Config.standUpKey]) then
                 DetachEntity(ped, true, true)
                 FreezeEntityPosition(ped, false)
                 ClearPedTasksImmediately(ped)
+                SetEntityCoords(cache.ped, cachedCoords.x, cachedCoords.y, cachedCoords.z - 1.0)
+                SetEntityHeading(cache.ped, cachedCoords.w)
+                cachedCoords = nil
                 TextUI.hide()
                 if cam then
-                    cam:remove()
-                    cam = nil
+                    cam:remove(); cam = nil
                 end
                 break
             end
             Wait(0)
         end
         if cam then
-            cam:remove()
-            cam = nil
+            cam:remove(); cam = nil
         end
+        Helpers.releasePose(entity, baseName)
     end)
 end
 
----Client-side trigger to perform a pose (respects occupancy).
+---Client-side trigger with per-entity bag check
 ---@param entity number
 ---@param pose string
 local function checkAndDo(entity, pose)
     if not DoesEntityExist(entity) then return end
-    if not canUseEntity(entity, cache.ped) then
-        Notify({ type = 'error', description = locale('occupied') })
+    if not hasPose(entity, pose) then return end
+    if not Helpers.isPoseFree(entity, pose) then
+        Notify({ color = 'negative', icon = 'fa-solid fa-circle-xmark', message = locale('occupied') })
         return
     end
     doPose(entity, pose)
 end
 
-
 -- ========= events =========
 
-
----Force “medical” on the nearest supported model within 2.0m (respects occupancy).
 RegisterNetEvent(Shared.event .. 'forceMedical', function()
     local ped = cache.ped
     local pos = GetEntityCoords(ped)
@@ -214,7 +109,7 @@ RegisterNetEvent(Shared.event .. 'forceMedical', function()
             local ent = GetClosestObjectOfType(pos.x, pos.y, pos.z, 10.0, model, false, false, false)
             if ent ~= 0 then
                 local dist = #(GetEntityCoords(ent) - pos)
-                if dist <= bestDist and HasEntityClearLosToEntity(ped, ent, 17) and canUseEntity(ent, ped) then
+                if dist <= bestDist and HasEntityClearLosToEntity(ped, ent, 17) and Helpers.isPoseFree(ent, 'medical') then
                     closestEnt, bestDist = ent, dist
                 end
             end
@@ -225,10 +120,7 @@ end)
 
 -- ========= targets =========
 
----Register target model options for all supported models/poses.
 local function registerTargets()
-    -- gather all model ids
-    ---@type integer[]
     local models = {}
     for model, _ in pairs(Models) do models[#models + 1] = model end
 
@@ -238,11 +130,9 @@ local function registerTargets()
             icon = 'fa-solid fa-bed',
             label = locale('laydown_medical'),
             distance = Config.target.distance,
-            ---@param entity number
             canInteract = function(entity)
-                return hasPose(entity, 'medical') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'medical') and Helpers.isPoseFree(entity, 'medical')
             end,
-            ---@param data {entity:number}
             onSelect = function(data) checkAndDo(data.entity, 'medical') end
         },
         {
@@ -251,7 +141,7 @@ local function registerTargets()
             label = locale('sit_chair'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'chair') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'chair') and Helpers.isPoseFree(entity, 'chair')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'chair') end
         },
@@ -261,7 +151,7 @@ local function registerTargets()
             label = locale('sit_chair2'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'chair2') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'chair2') and Helpers.isPoseFree(entity, 'chair2')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'chair2') end
         },
@@ -271,7 +161,7 @@ local function registerTargets()
             label = locale('sit_chair3'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'chair3') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'chair3') and Helpers.isPoseFree(entity, 'chair3')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'chair3') end
         },
@@ -281,7 +171,7 @@ local function registerTargets()
             label = locale('sit_chair4'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'chair4') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'chair4') and Helpers.isPoseFree(entity, 'chair4')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'chair4') end
         },
@@ -291,7 +181,7 @@ local function registerTargets()
             label = locale('sit_stool'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'stool') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'stool') and Helpers.isPoseFree(entity, 'stool')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'stool') end
         },
@@ -301,7 +191,7 @@ local function registerTargets()
             label = locale('use_slots'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'slots') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'slots') and Helpers.isPoseFree(entity, 'slots')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'slots') end
         },
@@ -311,11 +201,10 @@ local function registerTargets()
             label = locale('laydown_sunbed'),
             distance = Config.target.distance,
             canInteract = function(entity)
-                return hasPose(entity, 'sunbed') and canUseEntity(entity, cache.ped)
+                return hasPose(entity, 'sunbed') and Helpers.isPoseFree(entity, 'sunbed')
             end,
             onSelect = function(data) checkAndDo(data.entity, 'sunbed') end
         },
-        -- Put person on medical (config-gated)
         {
             name = 'sp_chairs:put_person_medical',
             icon = 'fa-solid fa-user-plus',
@@ -324,7 +213,7 @@ local function registerTargets()
             canInteract = function(entity)
                 if not Config.allowPutOnMedicalBeds then return false end
                 if not hasPose(entity, 'medical') then return false end
-                if not canUseEntity(entity, cache.ped) then return false end
+                if not Helpers.isPoseFree(entity, 'medical') then return false end
                 local myPos = GetEntityCoords(cache.ped)
                 local pid, ped = lib.getClosestPlayer(myPos, 2.0, false)
                 return pid and DoesEntityExist(ped)
@@ -341,9 +230,20 @@ local function registerTargets()
     })
 end
 
----Target registration on resource start.
----@param res string
 AddEventHandler('onClientResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     registerTargets()
+end)
+
+
+
+AddEventHandler('onClientResourceStop', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    local ped = cache.ped
+    local ent = IsEntityAttached(ped) and GetEntityAttachedTo(ped)
+    if ent and ent ~= 0 then
+        for _, pose in ipairs({ 'chair', 'chair2', 'chair3', 'chair4', 'stool', 'sunbed', 'medical', 'slots' }) do
+            Helpers.releasePose(ent, pose)
+        end
+    end
 end)

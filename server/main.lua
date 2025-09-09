@@ -1,8 +1,9 @@
-local Config = require 'shared.config'
+local Config = require('shared.config')
 
 RegisterNetEvent(Shared.serverEvent .. 'putOnMedical', function(targetServerId)
     if not Config.allowPutOnMedicalBeds then return end
     if type(targetServerId) ~= 'number' then return end
+
     if Config.wasabiPoliceCompat and GetResourceState('wasabi_police') == 'started' then
         local state = Player(targetServerId).state
         if state.escorted == true then
@@ -11,6 +12,7 @@ RegisterNetEvent(Shared.serverEvent .. 'putOnMedical', function(targetServerId)
             state:set('escorted', false, true)
         end
     end
+
     TriggerClientEvent(Shared.event .. 'forceMedical', targetServerId)
 end)
 
